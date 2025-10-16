@@ -4,7 +4,7 @@ if (!SpeechRecognition) {
     alert("Sorry, your browser doesn't support the Speech Recognition API. Try Chrome or Firefox.");
 }
 const recognition = new SpeechRecognition();
-recognition.continuous = false;
+recognition.continuous = true; // Enable continuous listening
 recognition.interimResults = true;
 recognition.lang = 'en-US';
 
@@ -89,12 +89,14 @@ function stopListening() {
 function toggleListening() {
     if (isProcessing) return; // Don't interrupt processing
 
-    if (!isListening) {
+    if (!conversationStarted) {
         conversationStarted = true;
         startListening();
     } else {
         conversationStarted = false;
         stopListening();
+        updateCircleState('idle');
+        clearStatus();
     }
 }
 
@@ -125,13 +127,10 @@ function clearStatus() {
 
 async function handleUserInput(userMessage) {
     if (!userMessage.trim()) {
-        updateCircleState('idle');
+        // Don't change state on empty input, just continue listening
         return;
     }
     
-    // Stop recognition explicitly, as we have the final result.
-    stopListening();
-
     setStatus(`You said: "${userMessage.substring(0, 50)}..."`);
 
     // Add to history
@@ -181,8 +180,10 @@ async function getAIResponse() {
         await speakResponse("I'm sorry, I seem to have a problem thinking right now. Please try again in a moment.");
     } finally {
         isProcessing = false;
+        // After speaking, go back to listening state if conversation is active
         if (conversationStarted) {
-            startListening();
+            updateCircleState('listening');
+            setStatus('Listening...');
         } else {
             updateCircleState('idle');
             clearStatus();
