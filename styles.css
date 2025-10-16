@@ -54,6 +54,7 @@ body {
 .circle-inner {
     font-size: 60px;
     transition: all 0.3s ease;
+    user-select: none;
 }
 
 /* Listening state - circle shrinks */

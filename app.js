@@ -1,8 +1,12 @@
 // Speech Recognition Setup
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+if (!SpeechRecognition) {
+    alert("Sorry, your browser doesn't support the Speech Recognition API. Try Chrome or Firefox.");
+}
 const recognition = new SpeechRecognition();
 recognition.continuous = false;
 recognition.interimResults = true;
+recognition.lang = 'en-US';
 
 // State
 let conversationHistory = [];
@@ -13,6 +17,7 @@ let currentAudio = null;
 // DOM Elements
 const circle = document.getElementById('circle');
 const statusDiv = document.getElementById('status');
+const circleIcon = document.querySelector('.circle-icon');
 
 // Event Listeners
 circle.addEventListener('click', toggleListening);
@@ -25,20 +30,26 @@ recognition.onstart = () => {
 };
 
 recognition.onresult = (event) => {
-    let transcript = '';
-    
+    let finalTranscript = '';
     for (let i = event.resultIndex; i < event.results.length; i++) {
-        const transcriptSegment = event.results[i][0].transcript;
-        transcript += transcriptSegment;
+        // We only want the final transcript
+        if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript;
+        }
     }
-    
-    if (event.isFinal) {
-        handleUserInput(transcript);
+
+    // Only process if we have a final transcript
+    if (finalTranscript) {
+        handleUserInput(finalTranscript);
     }
 };
 
 recognition.onerror = (event) => {
-    setStatus(`Error: ${event.error}`);
+    if (event.error === 'no-speech') {
+        setStatus('Didn\'t catch that. Tap to try again.');
+    } else {
+        setStatus(`Error: ${event.error}`);
+    }
     updateCircleState('idle');
     isListening = false;
 };
@@ -52,9 +63,16 @@ recognition.onend = () => {
 };
 
 function toggleListening() {
-    if (!isListening && !isProcessing) {
-        recognition.start();
-    } else if (isListening) {
+    if (isProcessing) return; // Don't interrupt processing
+
+    if (!isListening) {
+        try {
+            recognition.start();
+        } catch(e) {
+            console.error("recognition.start error", e);
+            setStatus("Couldn't start listening.");
+        }
+    } else {
         recognition.stop();
     }
 }
@@ -62,6 +80,17 @@ function toggleListening() {
 function updateCircleState(state) {
     circle.classList.remove('idle', 'listening', 'processing');
     circle.classList.add(state);
+    
+    switch(state) {
+        case 'listening':
+            circleIcon.textContent = '...';
+            break;
+        case 'processing':
+            circleIcon.textContent = '🧠';
+            break;
+        default:
+            circleIcon.textContent = '🎤';
+    }
 }
 
 function setStatus(text) {
@@ -78,6 +107,10 @@ async function handleUserInput(userMessage) {
         updateCircleState('idle');
         return;
     }
+    
+    // Stop recognition explicitly, as we have the final result.
+    recognition.stop();
+    isListening = false;
 
     setStatus(`You said: "${userMessage.substring(0, 50)}..."`);
 
@@ -123,10 +156,31 @@ async function getAIResponse() {
 
     } catch (error) {
         console.error('Error getting AI response:', error);
-        setStatus('Error');
-        updateCircleState('idle');
+        setStatus('Oops, I had a problem thinking.');
+        await speakOnDevice("I'm sorry, I seem to have a problem thinking right now. Please try again in a moment.");
         isProcessing = false;
+        updateCircleState('idle');
     }
+}
+
+function speakOnDevice(text) {
+    return new Promise((resolve) => {
+        if (!('speechSynthesis' in window)) {
+            console.error("Browser doesn't support SpeechSynthesis.");
+            resolve();
+            return;
+        }
+        
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.onend = () => {
+            resolve();
+        };
+        utterance.onerror = (e) => {
+            console.error('SpeechSynthesis Error', e);
+            resolve(); // Resolve anyway to not block the flow
+        };
+        window.speechSynthesis.speak(utterance);
+    });
 }
 
 async function speakResponse(text) {
@@ -143,6 +197,7 @@ async function speakResponse(text) {
             // Stop any currently playing audio
             if (currentAudio) {
                 currentAudio.pause();
+                currentAudio.src = '';
             }
 
             // Play the audio
@@ -155,24 +210,32 @@ async function speakResponse(text) {
                 resolve();
             };
 
-            currentAudio.onerror = () => {
-                setStatus('Audio error');
+            currentAudio.onerror = async (e) => {
+                console.error("Audio playback error, falling back to on-device TTS.", e);
+                setStatus('Audio error, using device voice...');
+                await speakOnDevice(text);
                 updateCircleState('idle');
+                clearStatus();
                 isProcessing = false;
                 resolve();
             };
 
-            currentAudio.play().catch(error => {
-                console.error('Error playing audio:', error);
+            currentAudio.play().catch(async error => {
+                console.error('Error playing audio, falling back to on-device TTS:', error);
+                setStatus('Playback error, using device voice...');
+                await speakOnDevice(text);
                 updateCircleState('idle');
+                clearStatus();
                 isProcessing = false;
                 resolve();
             });
 
         } catch (error) {
-            console.error('Error with text-to-speech:', error);
-            setStatus('Audio error');
+            console.error('Error with text-to-speech service, falling back to on-device TTS:', error);
+            setStatus('TTS service error, using device voice...');
+            await speakOnDevice(text);
             updateCircleState('idle');
+            clearStatus();
             isProcessing = false;
             resolve();
         }
