@@ -31,16 +31,26 @@ recognition.onstart = () => {
 };
 
 recognition.onresult = (event) => {
+    // Check if we can be interrupted. We can be interrupted while the AI is speaking,
+    // but not while we are processing the AI's response from the server.
+    if (isProcessing && !currentAudio) {
+        return; 
+    }
+    
     let finalTranscript = '';
     for (let i = event.resultIndex; i < event.results.length; i++) {
-        // We only want the final transcript
         if (event.results[i].isFinal) {
             finalTranscript += event.results[i][0].transcript;
         }
     }
 
-    // Only process if we have a final transcript
     if (finalTranscript) {
+        // If the AI is currently speaking, interrupt it.
+        if (currentAudio) {
+            currentAudio.pause();
+            currentAudio.src = '';
+            currentAudio = null;
+        }
         handleUserInput(finalTranscript);
     }
 };
@@ -58,17 +68,23 @@ recognition.onerror = (event) => {
 
 recognition.onend = () => {
     isListening = false;
-    if (!isProcessing && !conversationStarted) {
+    if (isProcessing) {
+        // This can happen if the AI is taking a long time to respond and the recognition times out.
+        // We'll let getAIResponse handle restarting.
+        return;
+    }
+    
+    if (conversationStarted) {
+        // If conversation is active and we stopped listening for some reason (e.g. browser timeout), restart.
+        startListening();
+    } else {
         updateCircleState('idle');
         clearStatus();
-    } else if (!isProcessing && conversationStarted) {
-        // If conversation is active but we stopped listening for some reason (e.g. timeout), restart listening.
-        startListening();
     }
 };
 
 function startListening() {
-    if (isListening) return;
+    if (isListening || isProcessing) return;
     try {
         recognition.start();
     } catch (e) {
@@ -127,9 +143,11 @@ function clearStatus() {
 
 async function handleUserInput(userMessage) {
     if (!userMessage.trim()) {
-        // Don't change state on empty input, just continue listening
         return;
     }
+    
+    // We no longer stop listening here. The recognition service runs continuously.
+    // isProcessing flag will prevent onresult from firing new events.
     
     setStatus(`You said: "${userMessage.substring(0, 50)}..."`);
 
@@ -184,6 +202,8 @@ async function getAIResponse() {
         if (conversationStarted) {
             updateCircleState('listening');
             setStatus('Listening...');
+            // No need to call startListening() here as it should be running continuously.
+            // onend will handle restarts if it disconnects for some reason.
         } else {
             updateCircleState('idle');
             clearStatus();
