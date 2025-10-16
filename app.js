@@ -177,13 +177,15 @@ async function getAIResponse() {
     } catch (error) {
         console.error('Error getting AI response:', error);
         setStatus('Oops, I had a problem thinking.');
-        await speakOnDevice("I'm sorry, I seem to have a problem thinking right now. Please try again in a moment.");
+        // Use speakResponse for the error message as well, to benefit from its fallback logic
+        await speakResponse("I'm sorry, I seem to have a problem thinking right now. Please try again in a moment.");
     } finally {
         isProcessing = false;
         if (conversationStarted) {
             startListening();
         } else {
             updateCircleState('idle');
+            clearStatus();
         }
     }
 }
@@ -209,46 +211,69 @@ function speakOnDevice(text) {
 }
 
 async function speakResponse(text) {
-    return new Promise(async (resolve, reject) => {
+    return new Promise(async (resolve) => {
+        let fallbackTriggered = false;
+
+        const triggerFallback = async () => {
+            if (fallbackTriggered) return;
+            fallbackTriggered = true;
+
+            console.log("Triggering fallback TTS.");
+
+            if (currentAudio) {
+                // Prevent the original audio from ever playing
+                currentAudio.pause();
+                currentAudio.src = '';
+                currentAudio.onended = null;
+                currentAudio.onerror = null;
+                currentAudio = null;
+            }
+            
+            setStatus('Using device voice...');
+            await speakOnDevice(text);
+            resolve();
+        };
+
         try {
             setStatus('Speaking...');
-
-            // Use English male as default voice
             const result = await websim.textToSpeech({
                 text: text,
                 voice: 'en-male'
             });
 
-            // Stop any currently playing audio
             if (currentAudio) {
                 currentAudio.pause();
                 currentAudio.src = '';
+                currentAudio.onended = null;
+                currentAudio.onerror = null;
             }
 
-            // Play the audio
             currentAudio = new Audio(result.url);
-            
+
             currentAudio.onended = () => {
-                clearStatus();
-                resolve();
+                if (!fallbackTriggered) {
+                    clearStatus();
+                    resolve();
+                }
             };
 
             currentAudio.onerror = (e) => {
-                console.error("Audio playback error, falling back to on-device TTS.", e);
-                setStatus('Audio error, using device voice...');
-                speakOnDevice(text).then(resolve); // Resolve after fallback
+                console.error("Audio playback error, falling back.", e);
+                triggerFallback();
             };
 
-            currentAudio.play().catch(error => {
-                console.error('Error playing audio, falling back to on-device TTS:', error);
-                setStatus('Playback error, using device voice...');
-                speakOnDevice(text).then(resolve); // Resolve after fallback
-            });
+            // The play() method returns a Promise which can be rejected.
+            const playPromise = currentAudio.play();
+            if (playPromise) {
+                playPromise.catch(error => {
+                    console.error('Error playing audio (autoplay likely prevented), falling back.', error);
+                    triggerFallback();
+                });
+            }
 
         } catch (error) {
-            console.error('Error with text-to-speech service, falling back to on-device TTS:', error);
-            setStatus('TTS service error, using device voice...');
-            speakOnDevice(text).then(resolve); // Resolve after fallback
+            console.error('Error with TTS service, falling back.', error);
+            triggerFallback();
         }
     });
 }
