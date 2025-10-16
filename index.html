@@ -3,59 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Voice Chatbot</title>
+    <title>Voice Circle AI</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div class="container">
-        <div class="header">
-            <h1>🤖 Voice Chat AI</h1>
-            <p>Talk to AI and hear it respond</p>
-        </div>
-
-        <div class="settings-panel">
-            <div class="setting-group">
-                <label for="language-select">Language:</label>
-                <select id="language-select">
-                    <option value="en-male">English (Male)</option>
-                    <option value="en-female">English (Female)</option>
-                    <option value="es-male">Spanish (Male)</option>
-                    <option value="es-female">Spanish (Female)</option>
-                    <option value="fr-male">French (Male)</option>
-                    <option value="fr-female">French (Female)</option>
-                    <option value="de-male">German (Male)</option>
-                    <option value="de-female">German (Female)</option>
-                    <option value="it-male">Italian (Male)</option>
-                    <option value="it-female">Italian (Female)</option>
-                    <option value="pt-male">Portuguese (Male)</option>
-                    <option value="pt-female">Portuguese (Female)</option>
-                    <option value="hi-male">Hindi (Male)</option>
-                    <option value="hi-female">Hindi (Female)</option>
-                    <option value="ja-male">Japanese (Male)</option>
-                    <option value="ja-female">Japanese (Female)</option>
-                    <option value="zh-male">Chinese (Male)</option>
-                    <option value="zh-female">Chinese (Female)</option>
-                </select>
+        <div class="circle-wrapper">
+            <div class="circle" id="circle">
+                <div class="circle-inner">
+                    <span class="circle-icon">🎤</span>
+                </div>
             </div>
         </div>
-
-        <div class="chat-container">
-            <div id="messages" class="messages"></div>
-        </div>
-
-        <div class="controls">
-            <button id="start-btn" class="btn btn-primary">
-                <span class="mic-icon">🎤</span> Start Listening
-            </button>
-            <button id="stop-btn" class="btn btn-secondary" disabled>
-                Stop
-            </button>
-            <button id="clear-btn" class="btn btn-tertiary">
-                Clear Chat
-            </button>
-        </div>
-
-        <div class="status" id="status"></div>
+        
+        <div class="status-text" id="status"></div>
     </div>
 
     <script src="app.js"></script>

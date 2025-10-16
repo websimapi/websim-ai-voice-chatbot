@@ -11,25 +11,17 @@ let isProcessing = false;
 let currentAudio = null;
 
 // DOM Elements
-const startBtn = document.getElementById('start-btn');
-const stopBtn = document.getElementById('stop-btn');
-const clearBtn = document.getElementById('clear-btn');
-const messagesDiv = document.getElementById('messages');
+const circle = document.getElementById('circle');
 const statusDiv = document.getElementById('status');
-const languageSelect = document.getElementById('language-select');
 
 // Event Listeners
-startBtn.addEventListener('click', startListening);
-stopBtn.addEventListener('click', stopListening);
-clearBtn.addEventListener('click', clearChat);
+circle.addEventListener('click', toggleListening);
 
 // Speech Recognition Events
 recognition.onstart = () => {
     isListening = true;
-    startBtn.disabled = true;
-    stopBtn.disabled = false;
-    statusDiv.textContent = '🎤 Listening...';
-    statusDiv.className = 'status recording';
+    updateCircleState('listening');
+    setStatus('Listening...');
 };
 
 recognition.onresult = (event) => {
@@ -46,42 +38,48 @@ recognition.onresult = (event) => {
 };
 
 recognition.onerror = (event) => {
-    statusDiv.textContent = `❌ Error: ${event.error}`;
-    statusDiv.className = 'status';
+    setStatus(`Error: ${event.error}`);
+    updateCircleState('idle');
     isListening = false;
-    startBtn.disabled = false;
-    stopBtn.disabled = true;
 };
 
 recognition.onend = () => {
     isListening = false;
-    startBtn.disabled = false;
-    stopBtn.disabled = true;
+    if (!isProcessing) {
+        updateCircleState('idle');
+        clearStatus();
+    }
 };
 
-function startListening() {
+function toggleListening() {
     if (!isListening && !isProcessing) {
         recognition.start();
-    }
-}
-
-function stopListening() {
-    if (isListening) {
+    } else if (isListening) {
         recognition.stop();
     }
 }
 
-function clearChat() {
-    messagesDiv.innerHTML = '';
-    conversationHistory = [];
-    statusDiv.textContent = '';
+function updateCircleState(state) {
+    circle.classList.remove('idle', 'listening', 'processing');
+    circle.classList.add(state);
+}
+
+function setStatus(text) {
+    statusDiv.textContent = text;
+    statusDiv.classList.add('active');
+}
+
+function clearStatus() {
+    statusDiv.classList.remove('active');
 }
 
 async function handleUserInput(userMessage) {
-    if (!userMessage.trim()) return;
+    if (!userMessage.trim()) {
+        updateCircleState('idle');
+        return;
+    }
 
-    // Add user message to UI and history
-    addMessageToUI('user', userMessage);
+    // Add to history
     conversationHistory.push({
         role: 'user',
         content: userMessage
@@ -93,9 +91,8 @@ async function handleUserInput(userMessage) {
 
 async function getAIResponse() {
     isProcessing = true;
-    statusDiv.textContent = '🤖 Thinking...';
-    statusDiv.className = 'status processing';
-    startBtn.disabled = true;
+    updateCircleState('processing');
+    setStatus('Thinking...');
 
     try {
         // Keep only last 10 messages for context
@@ -113,38 +110,32 @@ async function getAIResponse() {
 
         const aiResponse = completion.content;
         
-        // Add AI message to history and UI
+        // Add AI message to history
         conversationHistory.push({
             role: 'assistant',
             content: aiResponse
         });
-        
-        addMessageToUI('ai', aiResponse);
 
         // Convert to speech
         await speakResponse(aiResponse);
 
     } catch (error) {
         console.error('Error getting AI response:', error);
-        statusDiv.textContent = '❌ Error getting response';
-        statusDiv.className = 'status';
+        setStatus('Error');
+        updateCircleState('idle');
     }
 
     isProcessing = false;
-    startBtn.disabled = false;
-    statusDiv.textContent = '';
 }
 
 async function speakResponse(text) {
     try {
-        statusDiv.textContent = '🔊 Speaking...';
-        statusDiv.className = 'status playing';
+        setStatus('Speaking...');
 
-        const voice = languageSelect.value;
-        
+        // Use English male as default voice
         const result = await websim.textToSpeech({
             text: text,
-            voice: voice
+            voice: 'en-male'
         });
 
         // Stop any currently playing audio
@@ -156,42 +147,21 @@ async function speakResponse(text) {
         currentAudio = new Audio(result.url);
         
         currentAudio.onended = () => {
-            statusDiv.textContent = '';
-            statusDiv.className = 'status';
+            updateCircleState('idle');
+            clearStatus();
         };
 
         currentAudio.onerror = () => {
-            statusDiv.textContent = '❌ Error playing audio';
-            statusDiv.className = 'status';
+            setStatus('Audio error');
+            updateCircleState('idle');
         };
 
+        updateCircleState('idle');
         currentAudio.play();
 
     } catch (error) {
         console.error('Error with text-to-speech:', error);
-        statusDiv.textContent = '❌ Error with audio';
-        statusDiv.className = 'status';
+        setStatus('Audio error');
+        updateCircleState('idle');
     }
 }
-
-function addMessageToUI(sender, text) {
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${sender}`;
-    
-    const contentDiv = document.createElement('div');
-    contentDiv.className = 'message-content';
-    contentDiv.textContent = text;
-    
-    const timeDiv = document.createElement('div');
-    timeDiv.className = 'message-time';
-    timeDiv.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    
-    messageDiv.appendChild(contentDiv);
-    messageDiv.appendChild(timeDiv);
-    
-    messagesDiv.appendChild(messageDiv);
-    
-    // Auto-scroll to bottom
-    messagesDiv.scrollTop = messagesDiv.scrollHeight;
-}
-
