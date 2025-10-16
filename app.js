@@ -79,6 +79,8 @@ async function handleUserInput(userMessage) {
         return;
     }
 
+    setStatus(`You said: "${userMessage.substring(0, 50)}..."`);
+
     // Add to history
     conversationHistory.push({
         role: 'user',
@@ -116,52 +118,63 @@ async function getAIResponse() {
             content: aiResponse
         });
 
-        // Convert to speech
+        // Convert to speech and wait for it to complete
         await speakResponse(aiResponse);
 
     } catch (error) {
         console.error('Error getting AI response:', error);
         setStatus('Error');
         updateCircleState('idle');
+        isProcessing = false;
     }
-
-    isProcessing = false;
 }
 
 async function speakResponse(text) {
-    try {
-        setStatus('Speaking...');
+    return new Promise(async (resolve) => {
+        try {
+            setStatus('Speaking...');
 
-        // Use English male as default voice
-        const result = await websim.textToSpeech({
-            text: text,
-            voice: 'en-male'
-        });
+            // Use English male as default voice
+            const result = await websim.textToSpeech({
+                text: text,
+                voice: 'en-male'
+            });
 
-        // Stop any currently playing audio
-        if (currentAudio) {
-            currentAudio.pause();
-        }
+            // Stop any currently playing audio
+            if (currentAudio) {
+                currentAudio.pause();
+            }
 
-        // Play the audio
-        currentAudio = new Audio(result.url);
-        
-        currentAudio.onended = () => {
-            updateCircleState('idle');
-            clearStatus();
-        };
+            // Play the audio
+            currentAudio = new Audio(result.url);
+            
+            currentAudio.onended = () => {
+                updateCircleState('idle');
+                clearStatus();
+                isProcessing = false;
+                resolve();
+            };
 
-        currentAudio.onerror = () => {
+            currentAudio.onerror = () => {
+                setStatus('Audio error');
+                updateCircleState('idle');
+                isProcessing = false;
+                resolve();
+            };
+
+            currentAudio.play().catch(error => {
+                console.error('Error playing audio:', error);
+                updateCircleState('idle');
+                isProcessing = false;
+                resolve();
+            });
+
+        } catch (error) {
+            console.error('Error with text-to-speech:', error);
             setStatus('Audio error');
             updateCircleState('idle');
-        };
-
-        updateCircleState('idle');
-        currentAudio.play();
-
-    } catch (error) {
-        console.error('Error with text-to-speech:', error);
-        setStatus('Audio error');
-        updateCircleState('idle');
-    }
+            isProcessing = false;
+            resolve();
+        }
+    });
 }
