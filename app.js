@@ -13,6 +13,7 @@ let conversationHistory = [];
 let isListening = false;
 let isProcessing = false;
 let currentAudio = null;
+let conversationStarted = false;
 
 // DOM Elements
 const circle = document.getElementById('circle');
@@ -47,6 +48,7 @@ recognition.onresult = (event) => {
 recognition.onerror = (event) => {
     if (event.error === 'no-speech') {
         setStatus('Didn\'t catch that. Tap to try again.');
+        conversationStarted = false; // Reset conversation on no-speech
     } else {
         setStatus(`Error: ${event.error}`);
     }
@@ -56,24 +58,43 @@ recognition.onerror = (event) => {
 
 recognition.onend = () => {
     isListening = false;
-    if (!isProcessing) {
+    if (!isProcessing && !conversationStarted) {
         updateCircleState('idle');
         clearStatus();
+    } else if (!isProcessing && conversationStarted) {
+        // If conversation is active but we stopped listening for some reason (e.g. timeout), restart listening.
+        startListening();
     }
 };
+
+function startListening() {
+    if (isListening) return;
+    try {
+        recognition.start();
+    } catch (e) {
+        console.error("recognition.start error", e);
+        setStatus("Couldn't start listening.");
+        updateCircleState('idle');
+        conversationStarted = false;
+    }
+}
+
+function stopListening() {
+    if (isListening) {
+        recognition.stop();
+    }
+    isListening = false;
+}
 
 function toggleListening() {
     if (isProcessing) return; // Don't interrupt processing
 
     if (!isListening) {
-        try {
-            recognition.start();
-        } catch(e) {
-            console.error("recognition.start error", e);
-            setStatus("Couldn't start listening.");
-        }
+        conversationStarted = true;
+        startListening();
     } else {
-        recognition.stop();
+        conversationStarted = false;
+        stopListening();
     }
 }
 
@@ -109,8 +130,7 @@ async function handleUserInput(userMessage) {
     }
     
     // Stop recognition explicitly, as we have the final result.
-    recognition.stop();
-    isListening = false;
+    stopListening();
 
     setStatus(`You said: "${userMessage.substring(0, 50)}..."`);
 
@@ -158,8 +178,13 @@ async function getAIResponse() {
         console.error('Error getting AI response:', error);
         setStatus('Oops, I had a problem thinking.');
         await speakOnDevice("I'm sorry, I seem to have a problem thinking right now. Please try again in a moment.");
+    } finally {
         isProcessing = false;
-        updateCircleState('idle');
+        if (conversationStarted) {
+            startListening();
+        } else {
+            updateCircleState('idle');
+        }
     }
 }
 
@@ -184,7 +209,7 @@ function speakOnDevice(text) {
 }
 
 async function speakResponse(text) {
-    return new Promise(async (resolve) => {
+    return new Promise(async (resolve, reject) => {
         try {
             setStatus('Speaking...');
 
@@ -204,40 +229,26 @@ async function speakResponse(text) {
             currentAudio = new Audio(result.url);
             
             currentAudio.onended = () => {
-                updateCircleState('idle');
                 clearStatus();
-                isProcessing = false;
                 resolve();
             };
 
-            currentAudio.onerror = async (e) => {
+            currentAudio.onerror = (e) => {
                 console.error("Audio playback error, falling back to on-device TTS.", e);
                 setStatus('Audio error, using device voice...');
-                await speakOnDevice(text);
-                updateCircleState('idle');
-                clearStatus();
-                isProcessing = false;
-                resolve();
+                speakOnDevice(text).then(resolve); // Resolve after fallback
             };
 
-            currentAudio.play().catch(async error => {
+            currentAudio.play().catch(error => {
                 console.error('Error playing audio, falling back to on-device TTS:', error);
                 setStatus('Playback error, using device voice...');
-                await speakOnDevice(text);
-                updateCircleState('idle');
-                clearStatus();
-                isProcessing = false;
-                resolve();
+                speakOnDevice(text).then(resolve); // Resolve after fallback
             });
 
         } catch (error) {
             console.error('Error with text-to-speech service, falling back to on-device TTS:', error);
             setStatus('TTS service error, using device voice...');
-            await speakOnDevice(text);
-            updateCircleState('idle');
-            clearStatus();
-            isProcessing = false;
-            resolve();
+            speakOnDevice(text).then(resolve); // Resolve after fallback
         }
     });
 }
