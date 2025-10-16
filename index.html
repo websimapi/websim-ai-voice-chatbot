@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Voice Chatbot</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 Voice Chat AI</h1>
+            <p>Talk to AI and hear it respond</p>
+        </div>
+
+        <div class="settings-panel">
+            <div class="setting-group">
+                <label for="language-select">Language:</label>
+                <select id="language-select">
+                    <option value="en-male">English (Male)</option>
+                    <option value="en-female">English (Female)</option>
+                    <option value="es-male">Spanish (Male)</option>
+                    <option value="es-female">Spanish (Female)</option>
+                    <option value="fr-male">French (Male)</option>
+                    <option value="fr-female">French (Female)</option>
+                    <option value="de-male">German (Male)</option>
+                    <option value="de-female">German (Female)</option>
+                    <option value="it-male">Italian (Male)</option>
+                    <option value="it-female">Italian (Female)</option>
+                    <option value="pt-male">Portuguese (Male)</option>
+                    <option value="pt-female">Portuguese (Female)</option>
+                    <option value="hi-male">Hindi (Male)</option>
+                    <option value="hi-female">Hindi (Female)</option>
+                    <option value="ja-male">Japanese (Male)</option>
+                    <option value="ja-female">Japanese (Female)</option>
+                    <option value="zh-male">Chinese (Male)</option>
+                    <option value="zh-female">Chinese (Female)</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="chat-container">
+            <div id="messages" class="messages"></div>
+        </div>
+
+        <div class="controls">
+            <button id="start-btn" class="btn btn-primary">
+                <span class="mic-icon">🎤</span> Start Listening
+            </button>
+            <button id="stop-btn" class="btn btn-secondary" disabled>
+                Stop
+            </button>
+            <button id="clear-btn" class="btn btn-tertiary">
+                Clear Chat
+            </button>
+        </div>
+
+        <div class="status" id="status"></div>
+    </div>
+
+    <script src="app.js"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body>
+</html>
+
